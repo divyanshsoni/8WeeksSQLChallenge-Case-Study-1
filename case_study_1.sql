@@ -51,3 +51,33 @@ INSERT INTO members
 VALUES
   ('A', '2021-01-07'),
   ('B', '2021-01-09');
+  
+-- 1. What is the total amount each customer spent at the restaurant?
+select sales.customer_id, sum(menu.price) as total_amount
+from dannys_diner.sales as sales join dannys_diner.menu as menu
+on sales.product_id = menu.product_id
+group by sales.customer_id
+order by sales.customer_id;
+
+-- 2. How many days has each customer visited the restaurant?
+select customer_id, count(distinct order_date) as num_days
+from dannys_diner.sales
+group by customer_id
+order by customer_id;
+
+-- 3. What was the first item from the menu purchased by each customer?
+with first_item as (select customer_id, s.product_id, product_name, row_number() over(partition by customer_id order by order_date) as rank
+             from dannys_diner.sales as s join dannys_diner.menu as m 
+            on s.product_id = m.product_id)
+
+select customer_id, product_name 
+from first_item
+where rank = 1
+
+-- 4. What is the most purchased item on the menu and how many times was it purchased by all customers?
+select m.product_name, count(s.product_id) as most_purchased
+from dannys_diner.sales as s join dannys_diner.menu as m
+on s.product_id = m.product_id
+group by m.product_name
+order by most_purchased desc
+limit 1
