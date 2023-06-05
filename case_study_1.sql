@@ -81,3 +81,69 @@ on s.product_id = m.product_id
 group by m.product_name
 order by most_purchased desc
 limit 1
+
+-- 5. Which item was the most popular for each customer?
+with popular_item as (
+  select customer_id, s.product_id, m.product_name,  
+  dense_rank() over(partition by customer_id order by count(s.product_id) desc) as product_rank 
+  from dannys_diner.sales as s join dannys_diner.menu as m 
+  on s.product_id = m.product_id
+  group by customer_id, s.product_id, m.product_name)
+
+select customer_id, product_name 
+from popular_item
+where product_rank = 1
+
+-- 6. Which item was purchased first by the customer after they became a member?
+with orders_after_membership as (select s.customer_id, s.order_date, s.product_id, m.join_date, row_number() over(partition by s.customer_id order by s.product_id) as product_rank
+from dannys_diner.sales as s join dannys_diner.members as m 
+on s.customer_id = m.customer_id
+            where s.order_date >= m.join_date)
+
+select customer_id, product_name
+from orders_after_membership as o join dannys_diner.menu as m
+on o. product_id = m.product_id
+where product_rank = 1
+order by customer_id
+
+-- 7. Which item was purchased just before the customer became a member?
+with orders_before_membership as (select s.customer_id, s.order_date, s.product_id, m.join_date, dense_rank() over(partition by s.customer_id order by order_date desc) as product_rank
+from dannys_diner.sales as s join dannys_diner.members as m 
+on s.customer_id = m.customer_id
+            where s.order_date < m.join_date)
+
+select customer_id, product_name
+from orders_before_membership as o join dannys_diner.menu as m
+on o. product_id = m.product_id
+where product_rank = 1
+order by customer_id
+
+-- 8. What is the total items and amount spent for each member before they became a member?
+with cte as (select m.customer_id, s.order_date, s.product_id, m.join_date
+from dannys_diner.sales as s join dannys_diner.members as m 
+on s.customer_id = m.customer_id
+            where s.order_date < m.join_date)
+
+select customer_id, count(c.product_id) as total_list, sum(m.price) as total_amount
+from cte as c join dannys_diner.menu as m
+on c.product_id = m.product_id
+group by customer_id
+order by customer_id
+
+-- 9.  If each $1 spent equates to 10 points and sushi has a 2x points multiplier - how many points would each customer have?
+with cte as (select customer_id, m.product_name, sum(m.price) as total_amount, 
+case 
+when m.product_name = 'sushi' then sum(m.price)*20
+else sum(m.price)*10
+end as points
+from dannys_diner.sales as s join dannys_diner.menu as m
+on s.product_id = m.product_id
+group by customer_id, m.product_name
+order by customer_id)
+
+select customer_id, sum(points) as total_points
+from cte
+group by customer_id
+
+-- 10. In the first week after a customer joins the program (including their join date) they earn 2x points on all items, not just sushi - how many points do 
+customer A and B have at the end of January?
